@@ -12,7 +12,10 @@
     </script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js">
     </script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js">
+</script>
     <style>
+        /* ---- MEVCUT STİLLER ---- */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -844,7 +847,6 @@
         .icon-action-btn:hover {
             background: rgba(0, 0, 0, 0.05);
         }
-        /* Rapor butonları özel renkler */
         .btn-iade {
             background: #f1c40f !important;
             color: #000 !important;
@@ -855,7 +857,6 @@
             color: #fff !important;
             border-color: #e74c3c !important;
         }
-        /* Kar/Zarar yüzdesi */
         .kar-yuzde {
             display: block;
             font-size: 10px;
@@ -870,7 +871,6 @@
         .kar-yuzde.zero {
             color: #f39c12;
         }
-        /* İşlem sütununda ikonların düzgün görünmesi */
         .rapor-islem {
             display: flex;
             gap: 4px;
@@ -881,21 +881,102 @@
             font-size: 14px;
             padding: 2px 4px;
         }
-        /* Tahsilat/Ödeme tablosu işlem sütunu */
-        .odeme-islem {
+
+        /* ---- YENİ: ŞİFRE EKRANI ---- */
+        #loginOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
             display: flex;
-            gap: 4px;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            backdrop-filter: blur(4px);
         }
-        .odeme-islem .icon-action-btn {
+        #loginOverlay .login-box {
+            background: #ffffff;
+            padding: 40px 30px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 380px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: modalIn 0.3s ease-out;
+        }
+        #loginOverlay .login-box .login-icon {
+            font-size: 60px;
+            margin-bottom: 10px;
+        }
+        #loginOverlay .login-box h2 {
+            font-size: 22px;
+            color: #2c3e50;
+            margin-bottom: 6px;
+        }
+        #loginOverlay .login-box p {
             font-size: 14px;
-            padding: 2px 4px;
+            color: #7f8c8d;
+            margin-bottom: 20px;
+        }
+        #loginOverlay .login-box input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            font-size: 16px;
+            margin-bottom: 18px;
+            transition: border 0.2s;
+            background: #f8f9fa;
+        }
+        #loginOverlay .login-box input:focus {
+            border-color: #3498db;
+            outline: none;
+            background: #fff;
+        }
+        #loginOverlay .login-box .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #loginOverlay .login-box .login-btn:hover {
+            background: #219a52;
+        }
+        #loginOverlay .login-box .login-error {
+            color: #e74c3c;
+            font-size: 13px;
+            margin-top: 10px;
+            min-height: 20px;
+        }
+        /* Giriş yapıldığında overlay'i gizle */
+        #loginOverlay.hidden {
+            display: none !important;
         }
     </style>
 </head>
 <body>
 
+    <!-- ---- ŞİFRE EKRANI ---- -->
+    <div id="loginOverlay">
+        <div class="login-box">
+            <div class="login-icon">🔐</div>
+            <h2>Hoş Geldiniz</h2>
+            <p>Lütfen erişim şifresini girin</p>
+            <input type="password" id="loginPassword" placeholder="Şifre" autofocus />
+            <button class="login-btn" onclick="sifreKontrol()">Giriş Yap</button>
+            <div id="loginError" class="login-error"></div>
+        </div>
+    </div>
+
+    <!-- ---- ANA UYGULAMA ---- -->
     <div class="container">
 
         <div class="logo-area" onclick="sayfaDegis('homePage')">
@@ -1028,7 +1109,6 @@
                 <button class="filter-pill" onclick="stokFiltrele('Bilgisayar', this)">💻 PC</button>
                 <button class="filter-pill" onclick="stokFiltrele('Direksiyon', this)">🏎️ Direksiyon</button>
                 <button class="filter-pill" onclick="stokFiltrele('Diğer', this)">⚡ Diğer</button>
-                <!-- İade Edilenler butonu kaldırıldı -->
             </div>
             <div class="table-container">
                 <table id="stokTable">
@@ -1123,10 +1203,12 @@
                 <button class="save-btn" onclick="manuelOdemeKaydet('tahsilat')" style="background:#2980b9;">Tahsilat Ekle</button>
             </div>
             <div id="tahsilatSeciliListe" style="display:none;">
-                <h4>Seçili Ürüne Ait Tahsilatlar</h4>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <h4 style="margin: 0;">Seçili Ürüne Ait Tahsilatlar</h4>
+                </div>
                 <div class="table-container" id="tahsilatSeciliContainer">
                     <table id="tahsilatTable">
-                        <thead><tr><th>Tarih</th><th>Açıklama</th><th>Tutar</th><th>İşlem</th></tr></thead>
+                        <thead><tr><th>Tarih</th><th>Açıklama</th><th>Tutar</th><th style="text-align: right;">İşlem</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -1149,10 +1231,12 @@
                 <button class="save-btn" onclick="manuelOdemeKaydet('odeme')" style="background:#f39c12;">Ödeme Ekle</button>
             </div>
             <div id="odemeSeciliListe" style="display:none;">
-                <h4>Seçili Ürüne Ait Ödemeler</h4>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <h4 style="margin: 0;">Seçili Ürüne Ait Ödemeler</h4>
+                </div>
                 <div class="table-container" id="odemeSeciliContainer">
                     <table id="odemeTable">
-                        <thead><tr><th>Tarih</th><th>Açıklama</th><th>Tutar</th><th>İşlem</th></tr></thead>
+                        <thead><tr><th>Tarih</th><th>Açıklama</th><th>Tutar</th><th style="text-align: right;">İşlem</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -1196,6 +1280,32 @@
             <div class="modal-btn-group" id="confirmBtnGroup">
                 <button class="modal-btn modal-btn-primary" id="confirmOk">Evet</button>
                 <button class="modal-btn modal-btn-cancel" id="confirmCancel">Vazgeç</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ÖDEME DÜZENLEME MODALI -->
+    <div id="odemeDuzenleModal" class="custom-modal-overlay">
+        <div class="custom-modal" style="text-align: left; max-width: 400px;">
+            <div class="modal-icon warning" style="margin: 0 auto 12px auto;">✏️</div>
+            <div class="modal-title" style="text-align: center;">Ödeme / Tahsilat Düzenle</div>
+            <input type="hidden" id="duzenleOdemeId" />
+            <input type="hidden" id="duzenleOdemeTip" />
+            <div class="form-group" style="margin-bottom: 10px;">
+                <label style="font-size: 12px; font-weight: 600;">Tarih</label>
+                <input type="date" id="duzenleOdemeTarihi" />
+            </div>
+            <div class="form-group" style="margin-bottom: 10px;">
+                <label style="font-size: 12px; font-weight: 600;">Açıklama</label>
+                <input type="text" id="duzenleOdemeAciklama" />
+            </div>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-size: 12px; font-weight: 600;">Tutar (TL)</label>
+                <input type="text" id="duzenleOdemeTutar" class="price-input" oninput="formatPrice(this)" />
+            </div>
+            <div class="modal-btn-group">
+                <button class="modal-btn modal-btn-primary" onclick="odemeGuncelleKaydet()">Güncelle</button>
+                <button class="modal-btn modal-btn-cancel" onclick="document.getElementById('odemeDuzenleModal').style.display='none'">Vazgeç</button>
             </div>
         </div>
     </div>
@@ -1270,6 +1380,7 @@
         </div>
     </div>
 
+    <!-- ---- JAVASCRIPT ---- -->
     <script>
         // ---------- FIREBASE ----------
         const firebaseConfig = {
@@ -1287,7 +1398,12 @@
         let globalOdemeler = [];
         let silinenUrunlerKumesi = [];
 
-        db.collection("isra_tum_veriler").doc("veri_paketi").onSnapshot((doc) => {
+       function firebaseVerileriniBaslat() {
+
+    db.collection("isra_tum_veriler")
+        .doc("veri_paketi")
+        .onSnapshot((doc) => {
+
             if (doc.exists) {
                 globalUrunler = doc.data().liste || [];
                 silinenUrunlerKumesi = doc.data().silinenler || [];
@@ -1295,17 +1411,34 @@
                 globalUrunler = [];
                 silinenUrunlerKumesi = [];
             }
+
             islemSonrasiGuncelleme();
+
+        }, (error) => {
+
+            console.error("Ürün verileri okunamadı:", error);
+
         });
 
-        db.collection("isra_odeme_listesi").doc("odeme_paketi").onSnapshot((doc) => {
+
+    db.collection("isra_odeme_listesi")
+        .doc("odeme_paketi")
+        .onSnapshot((doc) => {
+
             if (doc.exists) {
                 globalOdemeler = doc.data().liste || [];
             } else {
                 globalOdemeler = [];
             }
+
             islemSonrasiGuncelleme();
+
+        }, (error) => {
+
+            console.error("Ödeme verileri okunamadı:", error);
+
         });
+}
 
         function verileriAl() {
             let localData = localStorage.getItem('isra_local_urunler');
@@ -1351,6 +1484,60 @@
             if (aktifSayfa.id === 'tahsilatPage') tahsilatSeciliListele();
             if (aktifSayfa.id === 'odemePage') odemeSeciliListele();
         }
+
+       // ---------- FIREBASE ŞİFRE KONTROLÜ ----------
+
+// Firebase'de oluşturduğun kullanıcı e-postası
+const FIREBASE_KULLANICI_EMAIL = "israiletisim@gmail.com";
+
+function sifreKontrol() {
+    const input = document.getElementById('loginPassword');
+    const hata = document.getElementById('loginError');
+    const girilen = input.value.trim();
+
+    // En az 6 karakter
+    if (girilen.length < 6) {
+        hata.textContent = '❌ Şifre en az 6 karakter olmalıdır.';
+        input.focus();
+        return;
+    }
+
+    hata.textContent = 'Giriş yapılıyor...';
+
+    firebase.auth()
+        .signInWithEmailAndPassword(
+            FIREBASE_KULLANICI_EMAIL,
+            girilen
+        )
+        .then(() => {
+
+            // Giriş başarılı
+            document.getElementById('loginOverlay').classList.add('hidden');
+
+            hata.textContent = '';
+            input.value = '';
+            firebaseVerileriniBaslat();
+
+        })
+        .catch((error) => {
+
+            console.error("Firebase giriş hatası:", error);
+
+            hata.textContent = '❌ Hatalı şifre, tekrar deneyin.';
+
+            input.value = '';
+            input.focus();
+        });
+}
+
+        // Enter tuşuyla giriş
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('loginPassword').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    sifreKontrol();
+                }
+            });
+        });
 
         // ---------- YARDIMCI ----------
         function formatDate(isoDate) {
@@ -2020,7 +2207,6 @@
             });
         }
 
-        // Tahsilat seçiminde uyarı: stokta olan ürün seçilirse uyarı göster
         function tahsilatUrunSecDegisti(val) {
             let urunId = val ? parseInt(val) : null;
             let kutu = document.getElementById('tahsilatUrunBilgiKutusu');
@@ -2033,16 +2219,13 @@
                 return;
             }
 
-            // Eğer seçilen ürün STOKTA ise uyarı göster
             if (item.durum === "STOKTA") {
                 customConfirm(
                     "⚠️ Dikkat, Alınan Ürün İçin Tahsilat Yapmaya Çalışıyorsunuz. Emin Misiniz?",
                     function() {
-                        // Evet devam, işleme devam et
                         tahsilatUrunSecDevam(item, urunId);
                     },
                     function() {
-                        // Vazgeç, seçimi temizle
                         document.getElementById('tahsilatUrunSec').value = "";
                         kutu.style.display = 'none';
                         document.getElementById('tahsilatSeciliListe').style.display = 'none';
@@ -2052,7 +2235,6 @@
                     "Vazgeç"
                 );
             } else {
-                // Normal akış
                 tahsilatUrunSecDevam(item, urunId);
             }
         }
@@ -2071,7 +2253,6 @@
             tahsilatSeciliListele();
         }
 
-        // Ödeme seçiminde uyarı: satılmış ürün seçilirse uyarı göster
         function odemeUrunSecDegisti(val) {
             let urunId = val ? parseInt(val) : null;
             let kutu = document.getElementById('odemeUrunBilgiKutusu');
@@ -2084,16 +2265,13 @@
                 return;
             }
 
-            // Eğer seçilen ürün SATILDI ise uyarı göster
             if (item.durum === "SATILDI") {
                 customConfirm(
                     "⚠️ Dikkat, Sattığınız Ürün İçin Ödeme Yapmaya Çalışıyorsunuz. Emin Misiniz?",
                     function() {
-                        // Evet devam
                         odemeUrunSecDevam(item, urunId);
                     },
                     function() {
-                        // Vazgeç, seçimi temizle
                         document.getElementById('odemeUrunSec').value = "";
                         kutu.style.display = 'none';
                         document.getElementById('odemeSeciliListe').style.display = 'none';
@@ -2103,7 +2281,6 @@
                     "Vazgeç"
                 );
             } else {
-                // Normal akış
                 odemeUrunSecDevam(item, urunId);
             }
         }
@@ -2138,34 +2315,22 @@
 
             let rowsHtml = '';
             if (item && item.satisAlinanMiktar > 0) {
-                rowsHtml += `
-                    <tr>
-                        <td>${formatDate(item.satisTarihi || item.tarih)}</td>
-                        <td>Peşin / İlk Satış Tahsilatı</td>
-                        <td>${item.satisAlinanMiktar.toLocaleString('tr-TR')} TL</td>
-                        <td style="text-align:center;">
-                            <div class="odeme-islem">
-                                <button class="icon-action-btn" onclick="odemeDetayGoster(${Date.now()})" title="Detay" style="display:none;">✏️</button>
-                                <button class="icon-action-btn" onclick="odemeSil(${Date.now()})" title="Sil" style="display:none;">🗑️</button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                rowsHtml +=
+                    `<tr><td>${formatDate(item.satisTarihi || item.tarih)}</td><td>Peşin / İlk Satış Tahsilatı</td><td>${item.satisAlinanMiktar.toLocaleString('tr-TR')} TL</td><td style="text-align: right;">-</td></tr>`;
             }
             urunOdemeleri.forEach(o => {
-                rowsHtml += `
-                    <tr>
+                rowsHtml +=
+                    `<tr>
                         <td>${formatDate(o.tarih)}</td>
                         <td>${o.aciklama}</td>
                         <td>${o.tutar.toLocaleString('tr-TR')} TL</td>
-                        <td style="text-align:center;">
-                            <div class="odeme-islem">
-                                <button class="icon-action-btn" onclick="odemeDetayGoster(${o.id})" title="Detay">✏️</button>
-                                <button class="icon-action-btn" onclick="odemeSil(${o.id})" title="Sil" style="color:#e74c3c;">🗑️</button>
+                        <td style="text-align: right;">
+                            <div class="icon-btn-group" style="justify-content: flex-end;">
+                                <button class="icon-action-btn" onclick="odemeDuzenleModalAc(${o.id}, 'tahsilat')" title="Düzenle">✏️</button>
+                                <button class="icon-action-btn" onclick="odemeSil(${o.id})" title="Sil">🗑️</button>
                             </div>
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
             });
 
             if (rowsHtml === '') {
@@ -2193,34 +2358,22 @@
 
             let rowsHtml = '';
             if (item && item.alisOdenenMiktar > 0) {
-                rowsHtml += `
-                    <tr>
-                        <td>${formatDate(item.tarih)}</td>
-                        <td>Peşin / İlk Alış Ödemesi</td>
-                        <td>${item.alisOdenenMiktar.toLocaleString('tr-TR')} TL</td>
-                        <td style="text-align:center;">
-                            <div class="odeme-islem">
-                                <button class="icon-action-btn" onclick="odemeDetayGoster(${Date.now()})" title="Detay" style="display:none;">✏️</button>
-                                <button class="icon-action-btn" onclick="odemeSil(${Date.now()})" title="Sil" style="display:none;">🗑️</button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                rowsHtml +=
+                    `<tr><td>${formatDate(item.tarih)}</td><td>Peşin / İlk Alış Ödemesi</td><td>${item.alisOdenenMiktar.toLocaleString('tr-TR')} TL</td><td style="text-align: right;">-</td></tr>`;
             }
             urunOdemeleri.forEach(o => {
-                rowsHtml += `
-                    <tr>
+                rowsHtml +=
+                    `<tr>
                         <td>${formatDate(o.tarih)}</td>
                         <td>${o.aciklama}</td>
                         <td>${o.tutar.toLocaleString('tr-TR')} TL</td>
-                        <td style="text-align:center;">
-                            <div class="odeme-islem">
-                                <button class="icon-action-btn" onclick="odemeDetayGoster(${o.id})" title="Detay">✏️</button>
-                                <button class="icon-action-btn" onclick="odemeSil(${o.id})" title="Sil" style="color:#e74c3c;">🗑️</button>
+                        <td style="text-align: right;">
+                            <div class="icon-btn-group" style="justify-content: flex-end;">
+                                <button class="icon-action-btn" onclick="odemeDuzenleModalAc(${o.id}, 'odeme')" title="Düzenle">✏️</button>
+                                <button class="icon-action-btn" onclick="odemeSil(${o.id})" title="Sil">🗑️</button>
                             </div>
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
             });
 
             if (rowsHtml === '') {
@@ -2230,6 +2383,77 @@
                 tbody.innerHTML = rowsHtml;
             }
             listeDiv.style.display = 'block';
+        }
+
+        function odemeDuzenleModalAc(odemeId, tip) {
+            let odemeListesi = odemeListesiniAl();
+            let odeme = odemeListesi.find(o => o.id === odemeId);
+            if (!odeme) return;
+
+            document.getElementById('duzenleOdemeId').value = odeme.id;
+            document.getElementById('duzenleOdemeTip').value = tip;
+            document.getElementById('duzenleOdemeTarihi').value = odeme.tarih;
+            document.getElementById('duzenleOdemeAciklama').value = odeme.aciklama;
+            document.getElementById('duzenleOdemeTutar').value = odeme.tutar.toLocaleString('tr-TR');
+
+            document.getElementById('odemeDuzenleModal').style.display = 'flex';
+        }
+
+        function odemeGuncelleKaydet() {
+            let odemeId = parseInt(document.getElementById('duzenleOdemeId').value);
+            let tip = document.getElementById('duzenleOdemeTip').value;
+            let tarih = document.getElementById('duzenleOdemeTarihi').value;
+            let aciklama = document.getElementById('duzenleOdemeAciklama').value.trim();
+            let tutar = getRawPrice(document.getElementById('duzenleOdemeTutar'));
+
+            if (!tarih || tutar <= 0) {
+                uyariPopupGoster("Lütfen geçerli bir tarih ve tutar giriniz!");
+                return;
+            }
+
+            let odemeListesi = odemeListesiniAl();
+            let odeme = odemeListesi.find(o => o.id === odemeId);
+            if (!odeme) return;
+
+            odeme.tarih = tarih;
+            odeme.aciklama = aciklama;
+            odeme.tutar = tutar;
+
+            odemeListesiniKaydet(odemeListesi);
+            document.getElementById('odemeDuzenleModal').style.display = 'none';
+
+            if (tip === 'tahsilat') {
+                tahsilatUrunSecDegisti(odeme.urunId);
+            } else {
+                odemeUrunSecDegisti(odeme.urunId);
+            }
+            bildirimGoster("Kayıt başarıyla güncellendi!", tip === 'tahsilat' ? 'tahsilatPage' : 'odemePage');
+        }
+
+        function odemeSil(odemeId) {
+            customConfirm(
+                "Bu ödeme/tahsilat kaydını silmek istediğinizden emin misiniz?",
+                function() {
+                    let odemeListesi = odemeListesiniAl();
+                    let odeme = odemeListesi.find(o => o.id === odemeId);
+                    if (!odeme) return;
+
+                    let tip = odeme.tip;
+                    let urunId = odeme.urunId;
+
+                    let yeniListe = odemeListesi.filter(o => o.id !== odemeId);
+                    odemeListesiniKaydet(yeniListe);
+
+                    if (tip === 'tahsilat') {
+                        tahsilatUrunSecDegisti(urunId);
+                    } else {
+                        odemeUrunSecDegisti(urunId);
+                    }
+                    bildirimGoster("Kayıt başarıyla silindi!", tip === 'tahsilat' ? 'tahsilatPage' : 'odemePage');
+                },
+                null,
+                true
+            );
         }
 
         function manuelOdemeKaydet(tip) {
@@ -2256,7 +2480,6 @@
                 return;
             }
 
-            // Ekstra kontrol: tahsilat için stokta, ödeme için satılmış ürün uyarısı (butona basıldığında da kontrol)
             let listeVeri = verileriAl();
             let item = listeVeri.find(i => i.id === urunId);
             if (item) {
@@ -2264,12 +2487,9 @@
                     customConfirm(
                         "⚠️ Dikkat, Alınan Ürün İçin Tahsilat Yapmaya Çalışıyorsunuz. Emin Misiniz?",
                         function() {
-                            // Devam et
                             odemeKaydetIslemi(tip, urunId, tarih, aciklama, tutar);
                         },
-                        function() {
-                            // Vazgeç, hiçbir şey yapma
-                        },
+                        function() {},
                         false,
                         "Evet Devam",
                         "Vazgeç"
@@ -2290,7 +2510,6 @@
                 }
             }
 
-            // Normal kaydetme işlemi
             odemeKaydetIslemi(tip, urunId, tarih, aciklama, tutar);
         }
 
@@ -2308,7 +2527,6 @@
             odemeListesi.unshift(yeniOdeme);
             odemeListesiniKaydet(odemeListesi);
 
-            // Form alanlarını temizle
             document.getElementById(tip === 'tahsilat' ? 'tahsilatTutar' : 'odemeTutar').value = '';
             document.getElementById(tip === 'tahsilat' ? 'tahsilatAciklama' : 'odemeAciklama').value = '';
 
@@ -2382,6 +2600,8 @@
                 );
             }
 
+            document.getElementById('stokSayisiBaslik').textContent = filtrelenmis.length;
+
             filtrelenmis.sort((a, b) => {
                 let valA, valB;
                 if (stokSiralananKolon === 'tarih') {
@@ -2399,11 +2619,9 @@
                 } else if (stokSiralananKolon === 'fiyat') {
                     valA = a.fiyat || 0;
                     valB = b.fiyat || 0;
-                } else if (stokSiralananKolon === 'kalanborc') {
-                    let borcA = (a.fiyat || 0) - (a.alisOdenenMiktar || 0);
-                    let borcB = (b.fiyat || 0) - (b.alisOdenenMiktar || 0);
-                    valA = borcA;
-                    valB = borcB;
+                } else {
+                    valA = a.tarih || '';
+                    valB = b.tarih || '';
                 }
 
                 if (valA < valB) return stokSiralamaYon === 'asc' ? -1 : 1;
@@ -2411,62 +2629,310 @@
                 return 0;
             });
 
-            document.getElementById('stokSayisiBaslik').textContent = filtrelenmis.length;
-
             if (filtrelenmis.length === 0) {
-                tbody.innerHTML =
-                    `<tr><td colspan="6" style="text-align:center; padding:20px; color:#95a5a6;">Kayıtlı stok ürün bulunamadı.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#95a5a6; padding:20px;">Stokta ürün bulunmuyor.</td></tr>`;
                 return;
             }
 
-            let html = '';
             filtrelenmis.forEach(item => {
-                let tarihStr = formatDate(item.tarih);
-                let fiyatStr = (item.fiyat || 0).toLocaleString('tr-TR') + ' TL';
-                let toplamOdenen = globalOdemeler.filter(o => o.urunId === item.id && o.tip === 'odeme').reduce((top,
-                    o) => top + o.tutar, (item.alisOdenenMiktar || 0));
+                let tr = document.createElement('tr');
+                tr.className = 'clickable-row row-stok';
+                tr.onclick = function() { urunDetayGoster(item.id); };
+
+                let toplamOdenen = globalOdemeler.filter(o => o.urunId === item.id && o.tip === 'odeme').reduce((top, o) => top + o.tutar, (item.alisOdenenMiktar || 0));
                 let kalanBorc = (item.fiyat || 0) - toplamOdenen;
                 if (kalanBorc < 0) kalanBorc = 0;
 
-                let borcBadge = kalanBorc > 0 ?
-                    `<span style="color:#e74c3c; font-size:11px; display:block;">Borç: ${kalanBorc.toLocaleString('tr-TR')}</span>` :
-                    `<span style="color:#27ae60; font-size:11px; display:block;">Ödendi</span>`;
+                let kalanBorcHtml = kalanBorc > 0 ? `<span style="color:#e74c3c; font-weight:bold;">Borç: ${kalanBorc.toLocaleString('tr-TR')} TL</span>` : `<span style="color:#27ae60; font-weight:bold;">Ödendi</span>`;
 
-                html += `
-                    <tr class="clickable-row row-stok" onclick="urunDetayGoster(${item.id})">
-                        <td>${tarihStr}</td>
-                        <td>${item.tur || '-'}</td>
-                        <td>${item.marka || ''} ${item.model || ''}</td>
-                        <td>${item.kimden || '-'}</td>
-                        <td>${fiyatStr} ${borcBadge}</td>
-                        <td>
-                            <div class="icon-btn-group" onclick="event.stopPropagation()">
-                                <button class="icon-action-btn" onclick="urunDetayGoster(${item.id})" title="Detay / Düzenle">✏️</button>
-                                <button class="icon-action-btn" onclick="iadeIslemiBaslat(${item.id})" title="İade Al">🔄</button>
-                                <button class="icon-action-btn" onclick="urunSilModalAcTekil(${item.id})" title="Sil" style="color:#e74c3c;">🗑️</button>
-                            </div>
-                        </td>
-                    </tr>
+                tr.innerHTML = `
+                    <td>${formatDate(item.tarih)}</td>
+                    <td><b>${item.tur}</b></td>
+                    <td>${item.marka} ${item.model}</td>
+                    <td>${item.kimden || '-'}</td>
+                    <td><b>${(item.fiyat||0).toLocaleString('tr-TR')} TL</b></td>
+                    <td>${kalanBorcHtml}</td>
                 `;
+                tbody.appendChild(tr);
             });
-            tbody.innerHTML = html;
+        }
+
+        // ---------- ÜRÜN DETAY & DÜZENLEME ----------
+        function urunDetayGoster(id) {
+            let liste = verileriAl();
+            let item = liste.find(i => i.id === id);
+            if (!item) return;
+
+            document.getElementById('detailModalBaslik').textContent = `${item.marka} ${item.model} Detayı`;
+            document.getElementById('urunDuzenleBtn').style.display = 'inline-block';
+            document.getElementById('urunDuzenleBtn').setAttribute('onclick', `urunDuzenleModunaGec(${item.id})`);
+
+            let content = buildDetailContent(item);
+            document.getElementById('detailContent').innerHTML = content;
+
+            let footerBtns = `<button class="modal-btn modal-btn-primary" onclick="document.getElementById('detailModal').style.display='none'">Kapat</button>`;
+            if (item.durum === "SATILDI" && !item.iadeAciklama) {
+                footerBtns += `<button class="modal-btn modal-btn-secondary" onclick="iadeModalAc(${item.id})">🔄 İptal / İade Al</button>`;
+            }
+            document.getElementById('detailFooterBtns').innerHTML = footerBtns;
+            document.getElementById('detailModal').style.display = 'flex';
+        }
+
+        function buildDetailContent(item) {
+            let toplamTahsilat = globalOdemeler.filter(o => o.urunId === item.id && o.tip === 'tahsilat').reduce((top, o) => top + o.tutar, (item.satisAlinanMiktar || 0));
+            let toplamOdeme = globalOdemeler.filter(o => o.urunId === item.id && o.tip === 'odeme').reduce((top, o) => top + o.tutar, (item.alisOdenenMiktar || 0));
+            let kalanAlacak = (item.satisFiyati || 0) - toplamTahsilat;
+            if (kalanAlacak < 0) kalanAlacak = 0;
+            let kalanBorc = (item.fiyat || 0) - toplamOdeme;
+            if (kalanBorc < 0) kalanBorc = 0;
+
+            let karZarar = (item.satisFiyati || 0) - (item.fiyat || 0);
+
+            let html = `
+                <div class="detail-section">
+                    <div class="detail-section-title">Temel Bilgiler</div>
+                    <div class="detail-row"><span class="detail-label">Durum:</span><span class="detail-value"><b>${item.durum}</b></span></div>
+                    <div class="detail-row"><span class="detail-label">Ürün Türü:</span><span class="detail-value">${item.tur}</span></div>
+                    <div class="detail-row"><span class="detail-label">Marka / Model:</span><span class="detail-value">${item.marka} ${item.model}</span></div>
+                    <div class="detail-row"><span class="detail-label">IMEI 1 / Seri No:</span><span class="detail-value">${item.imei1 || item.imei || '-'}</span></div>
+                    <div class="detail-row"><span class="detail-label">IMEI 2:</span><span class="detail-value">${item.imei2 || '-'}</span></div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-section-title">Alış Bilgileri</div>
+                    <div class="detail-row"><span class="detail-label">Alış Tarihi:</span><span class="detail-value">${formatDate(item.tarih)}</span></div>
+                    <div class="detail-row"><span class="detail-label">Kimden Alındı:</span><span class="detail-value">${item.kimden || '-'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Alış Fiyatı:</span><span class="detail-value">${(item.fiyat||0).toLocaleString('tr-TR')} TL</span></div>
+                    <div class="detail-row"><span class="detail-label">Ödenen Tutar:</span><span class="detail-value">${toplamOdeme.toLocaleString('tr-TR')} TL</span></div>
+                    <div class="detail-row"><span class="detail-label">Kalan Borç:</span><span class="detail-value" style="color:${kalanBorc>0?'#e74c3c':'#27ae60'}; font-weight:bold;">${kalanBorc.toLocaleString('tr-TR')} TL</span></div>
+                </div>
+            `;
+
+            if (item.durum === "SATILDI") {
+                html += `
+                    <div class="detail-section">
+                        <div class="detail-section-title">Satış Bilgileri</div>
+                        <div class="detail-row"><span class="detail-label">Satış Tarihi:</span><span class="detail-value">${formatDate(item.satisTarihi)}</span></div>
+                        <div class="detail-row"><span class="detail-label">Kime Satıldı:</span><span class="detail-value">${item.Alici || '-'}</span></div>
+                        <div class="detail-row"><span class="detail-label">Satış Fiyatı:</span><span class="detail-value">${(item.satisFiyati||0).toLocaleString('tr-TR')} TL</span></div>
+                        <div class="detail-row"><span class="detail-label">Tahsil Edilen:</span><span class="detail-value">${toplamTahsilat.toLocaleString('tr-TR')} TL</span></div>
+                        <div class="detail-row"><span class="detail-label">Kalan Alacak:</span><span class="detail-value" style="color:${kalanAlacak>0?'#e74c3c':'#27ae60'}; font-weight:bold;">${kalanAlacak.toLocaleString('tr-TR')} TL</span></div>
+                        <div class="detail-row"><span class="detail-label">Kar / Zarar:</span><span class="detail-value" style="color:${karZarar>=0?'#27ae60':'#e74c3c'}; font-weight:bold;">${karZarar>=0?'+':''}${karZarar.toLocaleString('tr-TR')} TL</span></div>
+                    </div>
+                `;
+            }
+
+            if (item.iadeAciklama) {
+                html += `
+                    <div class="detail-section" style="background:#fef9e7; padding:8px; border-radius:8px; border:1px solid #f9e79f;">
+                        <div class="detail-section-title" style="color:#d35400;">İptal / İade Bilgisi</div>
+                        <div class="detail-row"><span class="detail-label">Açıklama:</span><span class="detail-value">${item.iadeAciklama}</span></div>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function urunDuzenleModunaGec(id) {
+            let liste = verileriAl();
+            let item = liste.find(i => i.id === id);
+            if (!item) return;
+
+            document.getElementById('urunDuzenleBtn').style.display = 'none';
+
+            let html = `
+                <div class="form-group"><label>Ürün Türü</label>
+                    <select id="editTur">
+                        <option value="Telefon" ${item.tur==='Telefon'?'selected':''}>Telefon</option>
+                        <option value="Akıllı Saat" ${item.tur==='Akıllı Saat'?'selected':''}>Akıllı Saat</option>
+                        <option value="Kulaklık" ${item.tur==='Kulaklık'?'selected':''}>Kulaklık</option>
+                        <option value="Tablet" ${item.tur==='Tablet'?'selected':''}>Tablet</option>
+                        <option value="Akıllı Kalem" ${item.tur==='Akıllı Kalem'?'selected':''}>Akıllı Kalem</option>
+                        <option value="Oyun Konsolu" ${item.tur==='Oyun Konsolu'?'selected':''}>Oyun Konsolu</option>
+                        <option value="Bilgisayar" ${item.tur==='Bilgisayar'?'selected':''}>Bilgisayar</option>
+                        <option value="Direksiyon" ${item.tur==='Direksiyon'?'selected':''}>Direksiyon</option>
+                        <option value="Diğer" ${item.tur==='Diğer'?'selected':''}>Diğer</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Alış Tarihi</label><input type="date" id="editTarih" value="${item.tarih || ''}" /></div>
+                <div class="form-group"><label>Marka</label><input type="text" id="editMarka" value="${item.marka || ''}" /></div>
+                <div class="form-group"><label>Model</label><input type="text" id="editModel" value="${item.model || ''}" /></div>
+                <div class="form-group"><label>Alış Fiyatı (TL)</label><input type="text" id="editFiyat" class="price-input" value="${(item.fiyat||0).toLocaleString('tr-TR')}" oninput="formatPrice(this)" /></div>
+                <div class="form-group"><label>IMEI 1</label><input type="text" id="editImei1" value="${item.imei1 || item.imei || ''}" /></div>
+                <div class="form-group"><label>IMEI 2</label><input type="text" id="editImei2" value="${item.imei2 || ''}" /></div>
+                <div class="form-group"><label>Kimden Alındı</label><input type="text" id="editKimden" value="${item.kimden || ''}" /></div>
+            `;
+
+            if (item.durum === "SATILDI") {
+                html += `
+                    <hr style="margin:10px 0;">
+                    <div class="form-group"><label>Satış Tarihi</label><input type="date" id="editSatisTarihi" value="${item.satisTarihi || ''}" /></div>
+                    <div class="form-group"><label>Satış Fiyatı (TL)</label><input type="text" id="editSatisFiyati" class="price-input" value="${(item.satisFiyati||0).toLocaleString('tr-TR')}" oninput="formatPrice(this)" /></div>
+                    <div class="form-group"><label>Kime Satıldı</label><input type="text" id="editAlici" value="${item.Alici || ''}" /></div>
+                `;
+            }
+
+            document.getElementById('detailContent').innerHTML = html;
+            document.getElementById('detailFooterBtns').innerHTML = `
+                <button class="modal-btn modal-btn-primary" onclick="urunGuncelleKaydet(${item.id})">Kaydet</button>
+                <button class="modal-btn modal-btn-cancel" onclick="urunDetayGoster(${item.id})">Vazgeç</button>
+            `;
+        }
+
+        function urunGuncelleKaydet(id) {
+            let liste = verileriAl();
+            let item = liste.find(i => i.id === id);
+            if (!item) return;
+
+            item.tur = document.getElementById('editTur').value;
+            item.tarih = document.getElementById('editTarih').value;
+            item.marka = document.getElementById('editMarka').value.trim();
+            item.model = document.getElementById('editModel').value.trim();
+            item.fiyat = getRawPrice(document.getElementById('editFiyat'));
+            item.imei1 = document.getElementById('editImei1').value.trim();
+            item.imei2 = document.getElementById('editImei2').value.trim();
+            item.imei = item.imei1;
+            item.kimden = document.getElementById('editKimden').value.trim();
+
+            if (item.durum === "SATILDI") {
+                item.satisTarihi = document.getElementById('editSatisTarihi').value;
+                item.satisFiyati = getRawPrice(document.getElementById('editSatisFiyati'));
+                item.Alici = document.getElementById('editAlici').value.trim();
+            }
+
+            verileriKaydet(liste);
+            document.getElementById('detailModal').style.display = 'none';
+            bildirimGoster("Ürün bilgileri başarıyla güncellendi!", null);
+            islemSonrasiGuncelleme();
+        }
+
+        // ---------- İADE / İPTAL ----------
+        let iadeHedefId = null;
+
+        function iadeModalAc(id) {
+            iadeHedefId = id;
+            document.getElementById('detailModal').style.display = 'none';
+            document.getElementById('iadeSebepInput').value = '';
+            document.getElementById('iadeSebepModal').style.display = 'flex';
+        }
+
+        function iadeKaydetOnay() {
+            let sebep = document.getElementById('iadeSebepInput').value.trim();
+            if (!sebep) {
+                uyariPopupGoster("Lütfen iade gerekçesini yazınız!");
+                return;
+            }
+
+            let liste = verileriAl();
+            let item = liste.find(i => i.id === iadeHedefId);
+            if (!item) return;
+
+            item.durum = "STOKTA";
+            item.iadeAciklama = sebep;
+            item.satisTarihi = "";
+            item.satisFiyati = 0;
+            item.Alici = "";
+            item.satisAlinanMiktar = 0;
+
+            verileriKaydet(liste);
+            document.getElementById('iadeSebepModal').style.display = 'none';
+            bildirimGoster("Ürün iade alındı ve tekrar stoğa eklendi!", "stokPage");
+        }
+
+        function iadeEdilenlerModalAc() {
+            document.getElementById('ozelListeModalBaslik').textContent = "İade Edilen Ürünler";
+            document.getElementById('iadeAramaInput').value = '';
+            iadeModalListele();
+            document.getElementById('iptalIadeModal').style.display = 'flex';
+        }
+
+        function iadeModalListele() {
+            let liste = verileriAl();
+            let arama = document.getElementById('iadeAramaInput').value.toLowerCase().trim();
+            let tbody = document.querySelector('#iadeModalTable tbody');
+            tbody.innerHTML = '';
+
+            let iadeliler = liste.filter(i => i.iadeAciklama);
+            if (arama) {
+                iadeliler = iadeliler.filter(i =>
+                    (i.marka && i.marka.toLowerCase().includes(arama)) ||
+                    (i.model && i.model.toLowerCase().includes(arama)) ||
+                    (i.iadeAciklama && i.iadeAciklama.toLowerCase().includes(arama)) ||
+                    (i.kimden && i.kimden.toLowerCase().includes(arama))
+                );
+            }
+
+            if (iadeliler.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#95a5a6; padding:15px;">İade edilmiş ürün bulunmuyor.</td></tr>`;
+                return;
+            }
+
+            iadeliler.forEach(item => {
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${formatDate(item.tarih)}</td>
+                    <td><b>${item.marka} ${item.model}</b><br><small style="color:#e67e22;">${item.iadeAciklama}</small></td>
+                    <td><span style="color:#e67e22; font-weight:bold;">İade Edildi</span></td>
+                    <td><button class="stok-iptal-iade-btn" style="padding:4px 8px; font-size:11px;" onclick="document.getElementById('iptalIadeModal').style.display='none'; urunDetayGoster(${item.id})">İncele</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ---------- SİLİNENLER ----------
+        function silinenlerModalAc() {
+            document.getElementById('ozelListeModalBaslik').textContent = "Silinen Ürünler (Çöp Kutusu)";
+            document.getElementById('iadeAramaInput').value = '';
+            silinenlerModalListele();
+            document.getElementById('iptalIadeModal').style.display = 'flex';
+        }
+
+        function silinenlerModalListele() {
+            let tbody = document.querySelector('#iadeModalTable tbody');
+            tbody.innerHTML = '';
+
+            if (silinenUrunlerKumesi.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#95a5a6; padding:15px;">Çöp kutusu boş.</td></tr>`;
+                return;
+            }
+
+            silinenUrunlerKumesi.forEach((item, index) => {
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${formatDate(item.tarih)}</td>
+                    <td><b>${item.marka} ${item.model}</b><br><small style="color:#e74c3c;">${item.kimden || '-'}</small></td>
+                    <td><span style="color:#e74c3c; font-weight:bold;">Silindi</span></td>
+                    <td><button class="stok-iptal-iade-btn" style="padding:4px 8px; font-size:11px; background:#27ae60;" onclick="silineniGeriGetir(${index})">Geri Getir</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function silineniGeriGetir(index) {
+            let item = silinenUrunlerKumesi.splice(index, 1)[0];
+            let liste = verileriAl();
+            liste.unshift(item);
+            verileriKaydet(liste);
+            silinenleriKaydet(silinenUrunlerKumesi);
+            silinenlerModalListele();
+            bildirimGoster("Ürün başarıyla geri getirildi!", null);
         }
 
         // ---------- RAPOR SAYFASI ----------
-        let raporFiltreModu = 'all';
-        let raporDetayModu = 'toplam';
-        let raporSiralananKolon = 'tarih';
         let raporSiralamaYon = 'desc';
+        let raporSiralananKolon = 'tarih';
+        let raporAktifFiltreZaman = 'all';
+        let raporAktifKategoriTip = 'toplam';
 
-        function raporFiltrele(mod, btn) {
-            raporFiltreModu = mod;
+        function raporFiltrele(filterKey, btn) {
+            raporAktifFiltreZaman = filterKey;
             document.querySelectorAll('#raporFilterGroup button').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+            if (btn) btn.classList.add('active');
             raporGoster();
         }
 
-        function raporDetayGoster(mod) {
-            raporDetayModu = mod;
+        function raporDetayGoster(kategoriTip) {
+            raporAktifKategoriTip = kategoriTip;
             raporGoster();
         }
 
@@ -2484,463 +2950,180 @@
             raporGoster();
         }
 
-        // Ödeme detay gösterme ve silme fonksiyonları
-        function odemeDetayGoster(odemeId) {
-            let odeme = globalOdemeler.find(o => o.id === odemeId);
-            if (!odeme) {
-                uyariPopupGoster("Kayıt bulunamadı.");
-                return;
-            }
-            let ilgiliUrun = verileriAl().find(u => u.id === odeme.urunId);
-            let urunAdi = ilgiliUrun ? `${ilgiliUrun.marka} ${ilgiliUrun.model}` : 'Bilinmeyen Ürün';
-
-            let content = document.getElementById('detailContent');
-            content.innerHTML = `
-                <div class="detail-row"><span class="detail-label">İşlem Türü:</span><span class="detail-value">${odeme.tip === 'tahsilat' ? 'Tahsilat' : 'Ödeme'}</span></div>
-                <div class="detail-row"><span class="detail-label">Ürün:</span><span class="detail-value">${urunAdi}</span></div>
-                <div class="detail-row"><span class="detail-label">Tarih:</span><span class="detail-value">${formatDate(odeme.tarih)}</span></div>
-                <div class="detail-row"><span class="detail-label">Açıklama:</span><span class="detail-value">${odeme.aciklama || '-'}</span></div>
-                <div class="detail-row"><span class="detail-label">Tutar:</span><span class="detail-value">${odeme.tutar.toLocaleString('tr-TR')} TL</span></div>
-            `;
-            document.getElementById('detailModalBaslik').textContent = 'Ödeme / Tahsilat Detayı';
-            document.getElementById('urunDuzenleBtn').style.display = 'none';
-            document.getElementById('detailModal').style.display = 'flex';
-        }
-
-        function odemeSil(odemeId) {
-            customConfirm(
-                "Bu kaydı silmek istediğinize emin misiniz?",
-                function() {
-                    let odemeList = odemeListesiniAl();
-                    odemeList = odemeList.filter(o => o.id !== odemeId);
-                    odemeListesiniKaydet(odemeList);
-                    // Listeyi yenile
-                    let aktifSayfa = document.querySelector('.page.active');
-                    if (aktifSayfa) {
-                        if (aktifSayfa.id === 'tahsilatPage') tahsilatSeciliListele();
-                        else if (aktifSayfa.id === 'odemePage') odemeSeciliListele();
-                        else if (aktifSayfa.id === 'raporPage') raporGoster();
-                    }
-                    bildirimGoster("Kayıt silindi.", aktifSayfa ? aktifSayfa.id : 'homePage');
-                },
-                null,
-                true
-            );
-        }
-
         function raporGoster() {
             let liste = verileriAl();
             let arama = document.getElementById('raporAramaInput').value.toLowerCase().trim();
 
-            let aktifUrunler = liste.filter(i => i.durum !== "SİLİNDİ" && i.durum !== "İADE");
+            let stoktaOlanlar = liste.filter(i => i.durum === "STOKTA");
+            let satilanOlanlar = liste.filter(i => i.durum === "SATILDI");
 
-            let simdi = new Date();
-            let filtrelenmis = aktifUrunler.filter(item => {
-                let hedefTarihStr = item.durum === "SATILDI" ? (item.satisTarihi || item.tarih) : item.tarih;
-                if (!hedefTarihStr) return true;
-                let t = new Date(hedefTarihStr);
+            let toplamTahsilatTutar = 0;
+            let toplamOdemeTutar = 0;
 
-                if (raporFiltreModu === 'today') {
-                    return t.toDateString() === simdi.toDateString();
-                } else if (raporFiltreModu === 'week') {
-                    let birHaftaOnce = new Date();
-                    birHaftaOnce.setDate(simdi.getDate() - 7);
-                    return t >= birHaftaOnce && t <= simdi;
-                } else if (raporFiltreModu === 'month') {
-                    return t.getMonth() === simdi.getMonth() && t.getFullYear() === simdi.getFullYear();
-                } else if (raporFiltreModu === '3months') {
-                    let uclu = new Date();
-                    uclu.setMonth(simdi.getMonth() - 3);
-                    return t >= uclu && t <= simdi;
-                } else if (raporFiltreModu === '6months') {
-                    let alti = new Date();
-                    alti.setMonth(simdi.getMonth() - 6);
-                    return t >= alti && t <= simdi;
-                } else if (raporFiltreModu === 'year') {
-                    return t.getFullYear() === simdi.getFullYear();
-                }
-                return true;
+            satilanOlanlar.forEach(item => {
+                let t = globalOdemeler.filter(o => o.urunId === item.id && o.tip === 'tahsilat').reduce((sum, o) => sum + o.tutar, (item.satisAlinanMiktar || 0));
+                toplamTahsilatTutar += t;
+            });
+            globalOdemeler.filter(o => o.tip === 'tahsilat' && !satilanOlanlar.some(i => i.id === o.urunId)).forEach(o => {
+                toplamTahsilatTutar += o.tutar;
             });
 
-            let toplamSayi = filtrelenmis.length;
-            let stokSayi = filtrelenmis.filter(i => i.durum === "STOKTA").length;
-            let satilanSayi = filtrelenmis.filter(i => i.durum === "SATILDI").length;
+            liste.forEach(item => {
+                let o = globalOdemeler.filter(o => o.urunId === item.id && o.tip === 'odeme').reduce((sum, o) => sum + o.tutar, (item.alisOdenenMiktar || 0));
+                toplamOdemeTutar += o;
+            });
+            globalOdemeler.filter(o => o.tip === 'odeme' && !liste.some(i => i.id === o.urunId)).forEach(o => {
+                toplamOdemeTutar += o.tutar;
+            });
 
-            // Tahsilat: satılan ürünlerin satış fiyatları toplamı
-            let satilanUrunler = filtrelenmis.filter(i => i.durum === "SATILDI");
-            let tahsilatToplam = satilanUrunler.reduce((top, item) => top + (item.satisFiyati || 0), 0);
-            // Ödeme: satılan ürünlerin alış fiyatları toplamı
-            let odemeToplam = satilanUrunler.reduce((top, item) => top + (item.fiyat || 0), 0);
+            document.getElementById('raporToplamSayi').textContent = liste.length;
+            document.getElementById('raporStokSayi').textContent = stoktaOlanlar.length;
+            document.getElementById('raporSatilanSayi').textContent = satilanOlanlar.length;
+            document.getElementById('raporTahsilatSayi').textContent = toplamTahsilatTutar.toLocaleString('tr-TR') + ' ₺';
+            document.getElementById('raporOdemeSayi').textContent = toplamOdemeTutar.toLocaleString('tr-TR') + ' ₺';
 
-            document.getElementById('raporToplamSayi').textContent = toplamSayi;
-            document.getElementById('raporStokSayi').textContent = stokSayi;
-            document.getElementById('raporSatilanSayi').textContent = satilanSayi;
-            document.getElementById('raporTahsilatSayi').textContent = tahsilatToplam.toLocaleString('tr-TR') + ' TL';
-            document.getElementById('raporOdemeSayi').textContent = odemeToplam.toLocaleString('tr-TR') + ' TL';
-
-            let ustBilgiText = "";
-            if (raporDetayModu === 'toplam') ustBilgiText = `📋 Tüm Ürünler Listeleniyor (${toplamSayi} adet)`;
-            if (raporDetayModu === 'stok') ustBilgiText = `📦 Stoktaki Ürünler (${stokSayi} adet)`;
-            if (raporDetayModu === 'satilan') ustBilgiText =
-                `📤 Satılan Ürünler (${satilanSayi} adet)`;
-            if (raporDetayModu === 'tahsilat') ustBilgiText = `💰 Tahsilat (Satılan Ürünlerin Satış Toplamı): ${tahsilatToplam.toLocaleString('tr-TR')} TL`;
-            if (raporDetayModu === 'odeme') ustBilgiText = `💳 Ödeme (Satılan Ürünlerin Alış Toplamı): ${odemeToplam.toLocaleString('tr-TR')} TL`;
-            document.getElementById('raporUstEkBilgi').textContent = ustBilgiText;
-
-            let tabloVerileri = [];
-
-            if (raporDetayModu === 'toplam' || raporDetayModu === 'stok' || raporDetayModu === 'satilan') {
-                let hedefUrunler = filtrelenmis;
-                if (raporDetayModu === 'stok') hedefUrunler = filtrelenmis.filter(i => i.durum === "STOKTA");
-                if (raporDetayModu === 'satilan') hedefUrunler = filtrelenmis.filter(i => i.durum === "SATILDI");
-
-                hedefUrunler.forEach(item => {
-                    let aciklama = `${item.marka || ''} ${item.model || ''} (${item.tur || ''}) - Alış: ${item.kimden || '-'}`;
-                    if (item.durum === "SATILDI") {
-                        aciklama =
-                            `${item.marka || ''} ${item.model || ''} (${item.tur || ''}) - Satılan: ${item.Alici || '-'}`;
-                    }
-
-                    if (arama) {
-                        let textMatch = (item.marka && item.marka.toLowerCase().includes(arama)) ||
-                            (item.model && item.model.toLowerCase().includes(arama)) ||
-                            (item.kimden && item.kimden.toLowerCase().includes(arama)) ||
-                            (item.Alici && item.Alici.toLowerCase().includes(arama)) ||
-                            (item.imei1 && item.imei1.toLowerCase().includes(arama)) ||
-                            (item.tur && item.tur.toLowerCase().includes(arama));
-                        if (!textMatch) return;
-                    }
-
-                    let tutar = item.durum === "SATILDI" ? (item.satisFiyati || 0) : (item.fiyat || 0);
-                    let kar = 0;
-                    if (item.durum === "SATILDI") {
-                        kar = (item.satisFiyati || 0) - (item.fiyat || 0);
-                    }
-
-                    tabloVerileri.push({
-                        id: item.id,
-                        tarih: item.durum === "SATILDI" ? (item.satisTarihi || item.tarih) : item.tarih,
-                        aciklama: aciklama,
-                        durum: item.durum,
-                        tutar: tutar,
-                        kar: kar,
-                        tip: 'urun',
-                        hamItem: item
-                    });
+            let veriHavuzaGiren = [];
+            if (raporAktifKategoriTip === 'toplam') {
+                document.getElementById('raporAltBaslik').textContent = "Tüm Ürünler Detayı";
+                veriHavuzaGiren = [...liste];
+            } else if (raporAktifKategoriTip === 'stok') {
+                document.getElementById('raporAltBaslik').textContent = "Stoktaki Ürünler Detayı";
+                veriHavuzaGiren = [...stoktaOlanlar];
+            } else if (raporAktifKategoriTip === 'satilan') {
+                document.getElementById('raporAltBaslik').textContent = "Satılan Ürünler Detayı";
+                veriHavuzaGiren = [...satilanOlanlar];
+            } else if (raporAktifKategoriTip === 'tahsilat') {
+                document.getElementById('raporAltBaslik').textContent = "Tahsilatlar Detayı";
+                let satilanUrunler = liste.filter(i => i.durum === "SATILDI");
+                veriHavuzaGiren = satilanUrunler.map(u => {
+                    return {
+                        id: u.id,
+                        tarih: u.satisTarihi || u.tarih,
+                        aciklama: `${u.marka} ${u.model} (Toplam Satış Tutarı)`,
+                        durum: 'SATIŞ TUTARI',
+                        tutar: u.satisFiyati || 0,
+                        marka: u.marka || '',
+                        model: u.model || '',
+                        kar: (u.satisFiyati || 0) - (u.fiyat || 0)
+                    };
                 });
-            } else if (raporDetayModu === 'tahsilat' || raporDetayModu === 'odeme') {
-                // Tahsilat ve Ödeme modları: satılan ürünleri listele
-                let hedefUrunler = filtrelenmis.filter(i => i.durum === "SATILDI");
-                if (arama) {
-                    hedefUrunler = hedefUrunler.filter(item =>
-                        (item.marka && item.marka.toLowerCase().includes(arama)) ||
-                        (item.model && item.model.toLowerCase().includes(arama)) ||
-                        (item.Alici && item.Alici.toLowerCase().includes(arama)) ||
-                        (item.imei1 && item.imei1.toLowerCase().includes(arama)) ||
-                        (item.tur && item.tur.toLowerCase().includes(arama))
-                    );
-                }
-                hedefUrunler.forEach(item => {
-                    let tutar = raporDetayModu === 'tahsilat' ? (item.satisFiyati || 0) : (item.fiyat || 0);
-                    let aciklama = `${item.marka || ''} ${item.model || ''} (${item.tur || ''}) - ${raporDetayModu === 'tahsilat' ? 'Satış Fiyatı' : 'Alış Fiyatı'}`;
-                    tabloVerileri.push({
-                        id: item.id,
-                        tarih: item.satisTarihi || item.tarih,
-                        aciklama: aciklama,
-                        durum: 'SATILDI',
-                        tutar: tutar,
-                        kar: 0,
-                        tip: 'urun',
-                        hamItem: item
-                    });
+            } else if (raporAktifKategoriTip === 'odeme') {
+                document.getElementById('raporAltBaslik').textContent = "Ödemeler Detayı (Satılanların Geliş Maliyeti)";
+                let satilanUrunler = liste.filter(i => i.durum === "SATILDI");
+                veriHavuzaGiren = satilanUrunler.map(u => {
+                    return {
+                        id: u.id,
+                        tarih: u.satisTarihi || u.tarih,
+                        aciklama: `${u.marka} ${u.model} (Alış Maliyeti)`,
+                        durum: 'GELİŞ MALİYETİ',
+                        tutar: u.fiyat || 0,
+                        marka: u.marka || '',
+                        model: u.model || '',
+                        kar: 0
+                    };
                 });
             }
 
-            // Sıralama
-            tabloVerileri.sort((a, b) => {
-                let valA, valB;
-                if (raporSiralananKolon === 'tarih') {
-                    valA = a.tarih || '';
-                    valB = b.tarih || '';
-                } else if (raporSiralananKolon === 'aciklama') {
-                    valA = a.aciklama || '';
-                    valB = b.aciklama || '';
-                } else if (raporSiralananKolon === 'durum') {
-                    valA = a.durum || '';
-                    valB = b.durum || '';
-                } else if (raporSiralananKolon === 'tutar') {
-                    valA = a.tutar || 0;
-                    valB = b.tutar || 0;
-                } else if (raporSiralananKolon === 'kar') {
-                    valA = a.kar || 0;
-                    valB = b.kar || 0;
-                }
+            // Zaman filtresi (tahsilat ve ödeme dışındaki ürün listeleri için)
+            if (raporAktifKategoriTip !== 'tahsilat' && raporAktifKategoriTip !== 'odeme' && raporAktifFiltreZaman !== 'all') {
+                let simdi = new Date();
+                simdi.setHours(0,0,0,0);
+                veriHavuzaGiren = veriHavuzaGiren.filter(item => {
+                    let itemTarihStr = item.tarih || item.satisTarihi;
+                    if (!itemTarihStr) return false;
+                    let tDate = new Date(itemTarihStr);
+                    tDate.setHours(0,0,0,0);
 
-                if (valA < valB) return raporSiralamaYon === 'asc' ? -1 : 1;
-                if (valA > valB) return raporSiralamaYon === 'asc' ? 1 : -1;
-                return 0;
-            });
+                    if (raporAktifFiltreZaman === 'today') {
+                        return tDate.getTime() === simdi.getTime();
+                    } else if (raporAktifFiltreZaman === 'week') {
+                        let birHaftaOnce = new Date(simdi);
+                        birHaftaOnce.setDate(birHaftaOnce.getDate() - 7);
+                        return tDate >= birHaftaOnce && tDate <= simdi;
+                    } else if (raporAktifFiltreZaman === 'month') {
+                        let birAyOnce = new Date(simdi);
+                        birAyOnce.setMonth(birAyOnce.getMonth() - 1);
+                        return tDate >= birAyOnce && tDate <= simdi;
+                    } else if (raporAktifFiltreZaman === '3months') {
+                        let ucAyOnce = new Date(simdi);
+                        ucAyOnce.setMonth(ucAyOnce.getMonth() - 3);
+                        return tDate >= ucAyOnce && tDate <= simdi;
+                    } else if (raporAktifFiltreZaman === '6months') {
+                        let altiAyOnce = new Date(simdi);
+                        altiAyOnce.setMonth(altiAyOnce.getMonth() - 6);
+                        return tDate >= altiAyOnce && tDate <= simdi;
+                    } else if (raporAktifFiltreZaman === 'year') {
+                        let birYilOnce = new Date(simdi);
+                        birYilOnce.setFullYear(birYilOnce.getFullYear() - 1);
+                        return tDate >= birYilOnce && tDate <= simdi;
+                    }
+                    return true;
+                });
+            }
+
+            if (arama) {
+                veriHavuzaGiren = veriHavuzaGiren.filter(i => 
+                    (i.marka && i.marka.toLowerCase().includes(arama)) ||
+                    (i.model && i.model.toLowerCase().includes(arama)) ||
+                    (i.kimden && i.kimden.toLowerCase().includes(arama)) ||
+                    (i.Alici && i.Alici.toLowerCase().includes(arama)) ||
+                    (i.aciklama && i.aciklama.toLowerCase().includes(arama)) ||
+                    (i.imei1 && i.imei1.toLowerCase().includes(arama))
+                );
+            }
 
             let tbody = document.querySelector('#raporTable tbody');
             tbody.innerHTML = '';
 
-            if (tabloVerileri.length === 0) {
-                tbody.innerHTML =
-                    `<tr><td colspan="6" style="text-align:center; padding:20px; color:#95a5a6;">Bu kriterde rapor verisi bulunamadı.</td></tr>`;
+            if (veriHavuzaGiren.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#95a5a6; padding:20px;">Kayıt bulunamadı.</td></tr>`;
                 return;
             }
 
-            let html = '';
-            tabloVerileri.forEach(row => {
-                let tarihStr = formatDate(row.tarih);
-                let tutarStr = row.tutar.toLocaleString('tr-TR') + ' TL';
-                let karStr = '-';
-                let yuzdeStr = '';
-
-                if (row.tip === 'urun' && row.durum === "SATILDI") {
-                    let alisFiyat = row.hamItem.fiyat || 0;
-                    let kar = row.kar;
-                    if (kar > 0) {
-                        karStr = `<span class="profit-badge">+${kar.toLocaleString('tr-TR')} TL</span>`;
-                        let yuzde = (kar / alisFiyat * 100);
-                        if (yuzde > 0) {
-                            yuzdeStr =
-                                `<span class="kar-yuzde positive">% ${yuzde.toFixed(1)}</span>`;
-                        }
-                    } else if (kar < 0) {
-                        karStr = `<span class="loss-badge">${kar.toLocaleString('tr-TR')} TL</span>`;
-                        let yuzde = (kar / alisFiyat * 100);
-                        if (yuzde < 0) {
-                            yuzdeStr =
-                                `<span class="kar-yuzde negative">% ${Math.abs(yuzde).toFixed(1)}</span>`;
-                        }
-                    } else {
-                        karStr = `<span style="color:#f39c12;">0 TL</span>`;
-                        yuzdeStr = `<span class="kar-yuzde zero">% 0</span>`;
-                    }
-                } else if (row.tip === 'urun' && row.durum === "STOKTA") {
-                    karStr = '-';
-                    yuzdeStr = '';
-                } else {
-                    karStr = '-';
-                    yuzdeStr = '';
+            veriHavuzaGiren.forEach(item => {
+                let tr = document.createElement('tr');
+                tr.className = 'clickable-row';
+                if (item.id && !item.aciklama?.includes('Alış Maliyeti') && !item.aciklama?.includes('Toplam Satış Tutarı')) {
+                    tr.onclick = function() { urunDetayGoster(item.id); };
                 }
 
-                let rowClass = row.durum === "STOKTA" ? "row-stok" : (row.durum === "SATILDI" ? "row-satilan" : "");
-                let durumBadge = row.durum === "STOKTA" ?
-                    '<span style="color:#27ae60; font-weight:bold;">STOKTA</span>' :
-                    (row.durum === "SATILDI" ?
-                        '<span style="color:#e74c3c; font-weight:bold;">SATILDI</span>' :
-                        `<span style="color:#2980b9; font-weight:bold;">${row.durum}</span>`);
+                let aciklamaStr = item.aciklama || `${item.marka || ''} ${item.model || ''}`;
+                let durumStr = item.durum || '-';
+                let tutarVal = item.tutar !== undefined ? item.tutar : (item.durum === 'SATILDI' ? (item.satisFiyati || 0) : (item.fiyat || 0));
+                let karVal = item.kar !== undefined ? item.kar : (item.durum === 'SATILDI' ? ((item.satisFiyati || 0) - (item.fiyat || 0)) : 0);
 
-                let clickAction = row.tip === 'urun' ? `urunDetayGoster(${row.id})` : '';
-
-                // İşlem sütunu
-                let islemHtml = '';
-                if (row.tip === 'urun') {
-                    islemHtml = `
-                        <div class="rapor-islem" onclick="event.stopPropagation()">
-                            <button class="icon-action-btn" onclick="urunDetayGoster(${row.id})" title="Düzenle / İncele">✏️</button>
-                            <button class="icon-action-btn" onclick="iadeIslemiBaslat(${row.id})" title="İade Al">🔄</button>
-                            <button class="icon-action-btn" onclick="urunSilModalAcTekil(${row.id})" title="Sil" style="color:#e74c3c;">🗑️</button>
-                        </div>
-                    `;
-                } else {
-                    islemHtml = '-';
+                let karHtml = '-';
+                if (item.durum === 'SATILDI' || item.durum === 'SATIŞ TUTARI') {
+                    let yuzde = karYuzdesi(item.fiyat || 0, item.satisFiyati || tutarVal);
+                    let yuzdeClass = karVal > 0 ? 'positive' : (karVal < 0 ? 'negative' : 'zero');
+                    let yuzdeisaret = karVal > 0 ? '+' : '';
+                    karHtml = `<span style="color:${karVal>=0?'#27ae60':'#e74c3c'}; font-weight:bold;">${karVal>=0?'+':''}${karVal.toLocaleString('tr-TR')} TL</span>
+                               <span class="kar-yuzde ${yuzdeClass}">(${yuzdeisaret}%${yuzde.toFixed(1)})</span>`;
                 }
 
-                html += `
-                    <tr class="clickable-row ${rowClass}" onclick="${clickAction}">
-                        <td>${tarihStr}</td>
-                        <td>${row.aciklama}</td>
-                        <td>${durumBadge}</td>
-                        <td style="text-align:center;"><b>${tutarStr}</b></td>
-                        <td style="text-align:center; vertical-align:middle;">
-                            ${karStr}
-                            ${yuzdeStr}
-                        </td>
-                        <td style="text-align:center;">${islemHtml}</td>
-                    </tr>
+                tr.innerHTML = `
+                    <td>${formatDate(item.tarih || item.satisTarihi)}</td>
+                    <td>${aciklamaStr}</td>
+                    <td><b>${durumStr}</b></td>
+                    <td style="text-align:center;"><b>${tutarVal.toLocaleString('tr-TR')} TL</b></td>
+                    <td style="text-align:center;">${karHtml}</td>
+                    <td class="rapor-islem">
+                        ${item.id && !item.aciklama?.includes('Alış Maliyeti') && !item.aciklama?.includes('Toplam Satış Tutarı') ? `<button class="icon-action-btn" onclick="event.stopPropagation(); urunDetayGoster(${item.id})" title="Detay">🔍</button>` : '-'}
+                    </td>
                 `;
+                tbody.appendChild(tr);
             });
-            tbody.innerHTML = html;
         }
 
-        // ---------- İADE İŞLEMLERİ ----------
-        function iadeEdilenlerModalAc() {
-            let modal = document.getElementById('iptalIadeModal');
-            document.getElementById('ozelListeModalBaslik').textContent = "İptal / İade Edilen Ürünler";
-            iadeModalListele();
-            modal.style.display = 'flex';
-        }
-
-        function iadeModalListele() {
-            let liste = verileriAl();
-            let arama = document.getElementById('iadeAramaInput').value.toLowerCase().trim();
-            let tbody = document.querySelector('#iadeModalTable tbody');
-            tbody.innerHTML = '';
-
-            let iadeler = liste.filter(i => i.durum === "İADE");
-            if (arama) {
-                iadeler = iadeler.filter(i =>
-                    (i.marka && i.marka.toLowerCase().includes(arama)) ||
-                    (i.model && i.model.toLowerCase().includes(arama)) ||
-                    (i.imei1 && i.imei1.toLowerCase().includes(arama)) ||
-                    (i.kimden && i.kimden.toLowerCase().includes(arama))
-                );
-            }
-
-            if (iadeler.length === 0) {
-                tbody.innerHTML =
-                    `<tr><td colspan="4" style="text-align:center; color:#95a5a6;">İade edilmiş ürün bulunmuyor.</td></tr>`;
-                return;
-            }
-
-            let html = '';
-            iadeler.forEach(item => {
-                html += `
-                    <tr class="row-iade">
-                        <td>${formatDate(item.tarih)}</td>
-                        <td><b>${item.marka} ${item.model}</b><br><small style="color:#555;">Gerekçe: ${item.iadeAciklama || '-'}</small></td>
-                        <td><span style="color:#d35400; font-weight:bold;">İADE EDİLDİ</span></td>
-                        <td>
-                            <button class="modal-btn modal-btn-primary" style="padding:4px 8px; font-size:11px;" onclick="iadeGeriAl(${item.id})">Stoka Geri Al</button>
-                        </td>
-                    </tr>
-                `;
-            });
-            tbody.innerHTML = html;
-        }
-
-        let iadeEdilecekUrunId = null;
-
-        function iadeIslemiBaslat(urunId) {
-            iadeEdilecekUrunId = urunId;
-            document.getElementById('iadeSebepInput').value = '';
-            document.getElementById('iadeSebepModal').style.display = 'flex';
-        }
-
-        function iadeKaydetOnay() {
-            let sebep = document.getElementById('iadeSebepInput').value.trim();
-            if (!sebep) {
-                uyariPopupGoster("Lütfen iade gerekçesini yazınız!");
-                return;
-            }
-            let liste = verileriAl();
-            let item = liste.find(i => i.id === iadeEdilecekUrunId);
-            if (item) {
-                item.durum = "İADE";
-                item.iadeAciklama = sebep;
-                verileriKaydet(liste);
-                document.getElementById('iadeSebepModal').style.display = 'none';
-                document.getElementById('iptalIadeModal').style.display = 'none';
-                bildirimGoster("Ürün iade edilenler sayfasına taşındı.", "stokPage");
-            }
-        }
-
-        function iadeGeriAl(urunId) {
-            customConfirm(
-                "Bu iade edilen ürünü tekrar aktif stoka almak istiyor musunuz?",
-                function() {
-                    let liste = verileriAl();
-                    let item = liste.find(i => i.id === urunId);
-                    if (item) {
-                        item.durum = "STOKTA";
-                        item.iadeAciklama = "";
-                        verileriKaydet(liste);
-                        iadeModalListele();
-                        bildirimGoster("Ürün tekrar stoka alındı.", "stokPage");
-                    }
-                },
-                null,
-                false
-            );
-        }
-
-        // ---------- SİLİNENLER & ÜRÜN SİL ----------
-        function silinenlerModalAc() {
-            let modal = document.getElementById('iptalIadeModal');
-            document.getElementById('ozelListeModalBaslik').textContent = "Silinen Ürünler Arşivi";
-
-            let tbody = document.querySelector('#iadeModalTable tbody');
-            tbody.innerHTML = '';
-
-            if (silinenUrunlerKumesi.length === 0) {
-                tbody.innerHTML =
-                    `<tr><td colspan="4" style="text-align:center; color:#95a5a6;">Silinmiş ürün bulunmuyor.</td></tr>`;
-                modal.style.display = 'flex';
-                return;
-            }
-
-            let html = '';
-            silinenUrunlerKumesi.forEach(item => {
-                html += `
-                    <tr style="background-color: rgba(231, 76, 60, 0.2) !important;">
-                        <td>${formatDate(item.tarih)}</td>
-                        <td><b>${item.marka || ''} ${item.model || ''}</b><br><small style="color:#c0392b;">Silinen Ürün</small></td>
-                        <td><span style="color:#c0392b; font-weight:bold;">SİLİNDİ</span></td>
-                        <td>
-                            <button class="modal-btn modal-btn-primary" style="padding:4px 8px; font-size:11px;" onclick="silineniGeriYukle(${item.id})">Geri Yükle</button>
-                        </td>
-                    </tr>
-                `;
-            });
-            tbody.innerHTML = html;
-            modal.style.display = 'flex';
-        }
-
-        function silineniGeriYukle(urunId) {
-            let item = silinenUrunlerKumesi.find(i => i.id === urunId);
-            if (item) {
-                silinenUrunlerKumesi = silinenUrunlerKumesi.filter(i => i.id !== urunId);
-                item.durum = "STOKTA";
-                let liste = verileriAl();
-                liste.unshift(item);
-                verileriKaydet(liste);
-                silinenleriKaydet(silinenUrunlerKumesi);
-                silinenlerModalAc();
-                bildirimGoster("Ürün başarıyla geri yüklendi.", "raporPage");
-            }
-        }
-
-        // ÜRÜN SİL (ÇOKLU & TEKLİ)
+        // ---------- SİLME İŞLEMLERİ ----------
         let silSecilenIdler = [];
-        let tekilSilmeId = null;
 
         function urunSilModalAc() {
-            document.getElementById('urunSilModal').style.display = 'flex';
             document.getElementById('silAramaInput').value = '';
-            document.getElementById('silTumunuSec').checked = false;
             silSecilenIdler = [];
-            tekilSilmeId = null;
+            document.getElementById('silTumunuSec').checked = false;
             urunSilListele();
-        }
-
-        function urunSilModalAcTekil(urunId) {
-            tekilSilmeId = urunId;
-            let liste = verileriAl();
-            let item = liste.find(i => i.id === urunId);
-            if (!item) return;
-
-            customConfirm(
-                "Seçili Ürünü Silmek İstediğinizden Emin Misiniz?",
-                function() {
-                    customConfirm(
-                        "Bu İşlem Geri Alınamaz. Seçili Ürün Silinecektir..!",
-                        function() {
-                            gercektenUrunleriSil([urunId]);
-                        },
-                        null,
-                        true,
-                        "Evet Sil",
-                        "Vazgeç"
-                    );
-                },
-                null,
-                false,
-                "Evet Sil",
-                "Vazgeç"
-            );
+            document.getElementById('urunSilModal').style.display = 'flex';
         }
 
         function urunSilModalKapat() {
@@ -2953,65 +3136,69 @@
             let container = document.getElementById('silListContainer');
             container.innerHTML = '';
 
-            let aktifListe = liste.filter(i => i.durum !== "SİLİNDİ");
+            let filtrelenmis = liste;
             if (arama) {
-                aktifListe = aktifListe.filter(i =>
+                filtrelenmis = liste.filter(i =>
                     (i.marka && i.marka.toLowerCase().includes(arama)) ||
                     (i.model && i.model.toLowerCase().includes(arama)) ||
-                    (i.imei1 && i.imei1.toLowerCase().includes(arama)) ||
-                    (i.kimden && i.kimden.toLowerCase().includes(arama))
+                    (i.kimden && i.kimden.toLowerCase().includes(arama)) ||
+                    (i.Alici && i.Alici.toLowerCase().includes(arama)) ||
+                    (i.imei1 && i.imei1.toLowerCase().includes(arama))
                 );
             }
 
-            if (aktifListe.length === 0) {
-                container.innerHTML = `<div style="text-align:center; padding:15px; color:#95a5a6;">Ürün bulunamadı.</div>`;
-                document.getElementById('silSecimSayisi').textContent = "0 ürün seçildi";
+            if (filtrelenmis.length === 0) {
+                container.innerHTML = `<div style="text-align:center; color:#95a5a6; padding:15px;">Ürün bulunamadı.</div>`;
                 return;
             }
 
-            let html = '';
-            aktifListe.forEach(item => {
+            filtrelenmis.forEach(item => {
+                let row = document.createElement('div');
+                row.className = 'sil-checkbox-row';
                 let isChecked = silSecilenIdler.includes(item.id) ? 'checked' : '';
-                html += `
-                    <div class="sil-checkbox-row">
-                        <input type="checkbox" id="sil_chk_${item.id}" value="${item.id}" ${isChecked} onchange="silCheckboxDegisti(${item.id}, this)">
-                        <label for="sil_chk_${item.id}"><b>${item.marka || ''} ${item.model || ''}</b> - ${(item.fiyat||0).toLocaleString('tr-TR')} TL <small style="color:#555;">(${item.kimden || '-'})</small></label>
-                    </div>
+                row.innerHTML = `
+                    <input type="checkbox" id="silCheck_${item.id}" value="${item.id}" ${isChecked} onchange="silCheckboxDegisti(${item.id}, this)" />
+                    <label for="silCheck_${item.id}"><b>${formatDate(item.tarih)}</b> - ${item.marka} ${item.model} (${item.durum}) - ${(item.fiyat||0).toLocaleString('tr-TR')} TL</label>
                 `;
+                container.appendChild(row);
             });
-            container.innerHTML = html;
-            document.getElementById('silSecimSayisi').textContent = `${silSecilenIdler.length} ürün seçildi`;
+            silSecimSayisiGuncelle();
         }
 
-        function silCheckboxDegisti(id, chk) {
-            if (chk.checked) {
+        function silCheckboxDegisti(id, checkbox) {
+            if (checkbox.checked) {
                 if (!silSecilenIdler.includes(id)) silSecilenIdler.push(id);
             } else {
                 silSecilenIdler = silSecilenIdler.filter(i => i !== id);
             }
-            document.getElementById('silSecimSayisi').textContent = `${silSecilenIdler.length} ürün seçildi`;
+            silSecimSayisiGuncelle();
         }
 
         function silTumunuSecDegisti() {
-            let chkAll = document.getElementById('silTumunuSec');
             let liste = verileriAl();
             let arama = document.getElementById('silAramaInput').value.toLowerCase().trim();
-            let aktifListe = liste.filter(i => i.durum !== "SİLİNDİ");
+            let filtrelenmis = liste;
             if (arama) {
-                aktifListe = aktifListe.filter(i =>
+                filtrelenmis = liste.filter(i =>
                     (i.marka && i.marka.toLowerCase().includes(arama)) ||
                     (i.model && i.model.toLowerCase().includes(arama)) ||
-                    (i.imei1 && i.imei1.toLowerCase().includes(arama)) ||
-                    (i.kimden && i.kimden.toLowerCase().includes(arama))
+                    (i.kimden && i.kimden.toLowerCase().includes(arama)) ||
+                    (i.Alici && i.Alici.toLowerCase().includes(arama)) ||
+                    (i.imei1 && i.imei1.toLowerCase().includes(arama))
                 );
             }
 
-            if (chkAll.checked) {
-                silSecilenIdler = aktifListe.map(i => i.id);
+            let selectAll = document.getElementById('silTumunuSec').checked;
+            if (selectAll) {
+                silSecilenIdler = filtrelenmis.map(i => i.id);
             } else {
                 silSecilenIdler = [];
             }
             urunSilListele();
+        }
+
+        function silSecimSayisiGuncelle() {
+            document.getElementById('silSecimSayisi').textContent = `${silSecilenIdler.length} ürün seçildi`;
         }
 
         function urunSilBaslat() {
@@ -3020,209 +3207,54 @@
                 return;
             }
 
-            let liste = verileriAl();
-            let tumAktifUrunler = liste.filter(i => i.durum !== "SİLİNDİ");
-            let tumunuMuSecTi = silSecilenIdler.length === tumAktifUrunler.length;
+            customConfirm(
+                `Seçilen ${silSecilenIdler.length} ürünü silmek istediğinizden emin misiniz? (Silinenler çöp kutusuna taşınacaktır)`,
+                function() {
+                    let liste = verileriAl();
+                    let silinenlerListesi = silinenUrunlerKumesi || [];
 
-            urunSilModalKapat();
+                    let kalanlar = [];
+                    liste.forEach(item => {
+                        if (silSecilenIdler.includes(item.id)) {
+                            silinenlerListesi.unshift(item);
+                        } else {
+                            kalanlar.push(item);
+                        }
+                    });
 
-            if (tumunuMuSecTi) {
-                customConfirm(
-                    "Tüm Ürünleri Silmek İstediğinizden Emin Misiniz?",
-                    function() {
-                        customConfirm(
-                            "Tüm Ürünleri Silmeyi Seçtiniz Emin Misiniz?",
-                            function() {
-                                customConfirm(
-                                    "Bu İşlem Geri Alınamaz. Tüm Ürünler Silinecektir..!",
-                                    function() {
-                                        gercektenUrunleriSil(silSecilenIdler);
-                                    },
-                                    null,
-                                    true,
-                                    "Evet Sil",
-                                    "Vazgeç"
-                                );
-                            },
-                            null,
-                            true,
-                            "Evet Sil",
-                            "Vazgeç"
-                        );
-                    },
-                    null,
-                    false,
-                    "Evet Sil",
-                    "Vazgeç"
-                );
-            } else {
-                customConfirm(
-                    "Seçili Ürünleri Silmek İstediğinizden Emin Misiniz?",
-                    function() {
-                        customConfirm(
-                            "Bu İşlem Geri Alınamaz. Seçili Ürünler Silinecektir..!",
-                            function() {
-                                gercektenUrunleriSil(silSecilenIdler);
-                            },
-                            null,
-                            true,
-                            "Evet Sil",
-                            "Vazgeç"
-                        );
-                    },
-                    null,
-                    false,
-                    "Evet Sil",
-                    "Vazgeç"
-                );
-            }
+                    verileriKaydet(kalanlar);
+                    silinenleriKaydet(silinenlerListesi);
+
+                    urunSilModalKapat();
+                    bildirimGoster("Seçilen ürünler silindi!", "raporPage");
+                },
+                null,
+                true
+            );
         }
 
-        function gercektenUrunleriSil(idDizisi) {
-            let liste = verileriAl();
-            let silinenlerListesi = [...silinenUrunlerKumesi];
-
-            idDizisi.forEach(id => {
-                let idx = liste.findIndex(i => i.id === id);
-                if (idx !== -1) {
-                    let silinecek = liste.splice(idx, 1)[0];
-                    silinecek.durum = "SİLİNDİ";
-                    silinenlerListesi.unshift(silinecek);
-                }
-            });
-
-            verileriKaydet(liste);
-            silinenleriKaydet(silinenlerListesi);
-            bildirimGoster("Seçilen ürünler silindi ve raporlar sayfasına aktarıldı.", "raporPage");
-        }
-
-        // ---------- ÜRÜN DETAY & DÜZENLE ----------
-        let detayDuzenleModu = false;
-        let aktifDetayUrunId = null;
-
-        function urunDetayGoster(urunId) {
-            aktifDetayUrunId = urunId;
-            detayDuzenleModu = false;
-            let liste = verileriAl();
-            let item = liste.find(i => i.id === urunId);
-            if (!item) return;
-
-            document.getElementById('detailModalBaslik').textContent = "Ürün Detayı";
-            document.getElementById('urunDuzenleBtn').style.display = 'inline-block';
-            detayIcerikOlustur(item, false);
-            document.getElementById('detailModal').style.display = 'flex';
-        }
-
-        function detayIcerikOlustur(item, isEdit) {
-            let content = document.getElementById('detailContent');
-            let toplamOdenen = globalOdemeler.filter(o => o.urunId === item.id && o.tip === 'odeme').reduce((top, o) =>
-                top + o.tutar, (item.alisOdenenMiktar || 0));
-            let kalanBorc = (item.fiyat || 0) - toplamOdenen;
-            if (kalanBorc < 0) kalanBorc = 0;
-
-            let toplamTahsilat = globalOdemeler.filter(o => o.urunId === item.id && o.tip === 'tahsilat').reduce((top,
-                o) => top + o.tutar, (item.satisAlinanMiktar || 0));
-            let kalanAlacak = (item.satisFiyati || 0) - toplamTahsilat;
-            if (kalanAlacak < 0) kalanAlacak = 0;
-
-            if (!isEdit) {
-                content.innerHTML = `
-                    <div class="detail-row"><span class="detail-label">Ürün Türü:</span><span class="detail-value">${item.tur || '-'}</span></div>
-                    <div class="detail-row"><span class="detail-label">Marka / Model:</span><span class="detail-value"><b>${item.marka || ''} ${item.model || ''}</b></span></div>
-                    <div class="detail-row"><span class="detail-label">Durum:</span><span class="detail-value">${item.durum}</span></div>
-                    <div class="detail-row"><span class="detail-label">Alış Tarihi:</span><span class="detail-value">${formatDate(item.tarih)}</span></div>
-                    <div class="detail-row"><span class="detail-label">Alış Fiyatı:</span><span class="detail-value">${(item.fiyat || 0).toLocaleString('tr-TR')} TL</span></div>
-                    <div class="detail-row"><span class="detail-label">Ödenen / Kalan Borç:</span><span class="detail-value">${toplamOdenen.toLocaleString('tr-TR')} TL / <span style="color:${kalanBorc>0?'#e74c3c':'#27ae60'}">${kalanBorc.toLocaleString('tr-TR')} TL</span></span></div>
-                    <div class="detail-row"><span class="detail-label">Kimden Alındı:</span><span class="detail-value">${item.kimden || '-'}</span></div>
-                    <div class="detail-row"><span class="detail-label">IMEI 1 / Seri No:</span><span class="detail-value">${item.imei1 || item.imei || '-'}</span></div>
-                    <div class="detail-row"><span class="detail-label">IMEI 2:</span><span class="detail-value">${item.imei2 || '-'}</span></div>
-                    ${item.durum === "SATILDI" ? `
-                        <div class="detail-section"><div class="detail-section-title">Satış Bilgileri</div></div>
-                        <div class="detail-row"><span class="detail-label">Satış Tarihi:</span><span class="detail-value">${formatDate(item.satisTarihi)}</span></div>
-                        <div class="detail-row"><span class="detail-label">Satış Fiyatı:</span><span class="detail-value">${(item.satisFiyati || 0).toLocaleString('tr-TR')} TL</span></div>
-                        <div class="detail-row"><span class="detail-label">Tahsil Edilen / Kalan:</span><span class="detail-value">${toplamTahsilat.toLocaleString('tr-TR')} TL / <span style="color:${kalanAlacak>0?'#e74c3c':'#27ae60'}">${kalanAlacak.toLocaleString('tr-TR')} TL</span></span></div>
-                        <div class="detail-row"><span class="detail-label">Kime Satıldı:</span><span class="detail-value">${item.Alici || '-'}</span></div>
-                    ` : ``}
-                    ${item.iadeAciklama ? `
-                        <div class="detail-section"><div class="detail-section-title">İade Bilgisi</div></div>
-                        <div class="detail-row"><span class="detail-label">Gerekçe:</span><span class="detail-value" style="color:#d35400;">${item.iadeAciklama}</span></div>
-                    ` : ``}
-                `;
-            } else {
-                content.innerHTML = `
-                    <div class="form-group"><label>Ürün Türü</label><input type="text" id="editTur" value="${item.tur || ''}"></div>
-                    <div class="form-group"><label>Marka</label><input type="text" id="editMarka" value="${item.marka || ''}"></div>
-                    <div class="form-group"><label>Model</label><input type="text" id="editModel" value="${item.model || ''}"></div>
-                    <div class="form-group"><label>Alış Tarihi</label><input type="date" id="editTarih" value="${item.tarih || ''}"></div>
-                    <div class="form-group"><label>Alış Fiyatı (TL)</label><input type="text" id="editFiyat" class="price-input" value="${(item.fiyat || 0).toLocaleString('tr-TR')}" oninput="formatPrice(this)"></div>
-                    <div class="form-group"><label>Kimden Alındı</label><input type="text" id="editKimden" value="${item.kimden || ''}"></div>
-                    <div class="form-group"><label>IMEI 1</label><input type="text" id="editImei1" value="${item.imei1 || item.imei || ''}"></div>
-                    <div class="form-group"><label>IMEI 2</label><input type="text" id="editImei2" value="${item.imei2 || ''}"></div>
-                    ${item.durum === "SATILDI" ? `
-                        <div class="form-group"><label>Satış Tarihi</label><input type="date" id="editSatisTarihi" value="${item.satisTarihi || ''}"></div>
-                        <div class="form-group"><label>Satış Fiyatı (TL)</label><input type="text" id="editSatisFiyati" class="price-input" value="${(item.satisFiyati || 0).toLocaleString('tr-TR')}" oninput="formatPrice(this)"></div>
-                        <div class="form-group"><label>Kime Satıldı</label><input type="text" id="editAlici" value="${item.Alici || ''}"></div>
-                    ` : ``}
-                    <button class="modal-btn modal-btn-primary" style="width:100%; margin-top:10px;" onclick="urunGuncelleKaydet(${item.id})">Değişiklikleri Kaydet</button>
-                `;
-            }
-        }
-
-        function urunDuzenleModunaGec() {
-            detayDuzenleModu = true;
-            document.getElementById('urunDuzenleBtn').style.display = 'none';
-            let liste = verileriAl();
-            let item = liste.find(i => i.id === aktifDetayUrunId);
-            if (item) detayIcerikOlustur(item, true);
-        }
-
-        function urunGuncelleKaydet(urunId) {
-            let liste = verileriAl();
-            let item = liste.find(i => i.id === urunId);
-            if (!item) return;
-
-            item.tur = document.getElementById('editTur').value.trim();
-            item.marka = document.getElementById('editMarka').value.trim();
-            item.model = document.getElementById('editModel').value.trim();
-            item.tarih = document.getElementById('editTarih').value;
-            item.fiyat = getRawPrice(document.getElementById('editFiyat'));
-            item.kimden = document.getElementById('editKimden').value.trim();
-            item.imei1 = document.getElementById('editImei1').value.trim();
-            item.imei = item.imei1;
-            item.imei2 = document.getElementById('editImei2').value.trim();
-
-            if (item.durum === "SATILDI") {
-                item.satisTarihi = document.getElementById('editSatisTarihi').value;
-                item.satisFiyati = getRawPrice(document.getElementById('editSatisFiyati'));
-                item.Alici = document.getElementById('editAlici').value.trim();
-            }
-
-            verileriKaydet(liste);
-            document.getElementById('detailModal').style.display = 'none';
-            bildirimGoster("Ürün bilgileri başarıyla güncellendi.", "raporPage");
-        }
-
-        // ---------- EXCEL, PDF & YEDEKLEME ----------
+        // ---------- DIŞA AKTARIM & YEDEKLEME ----------
         function excelDisaAktar() {
             let liste = verileriAl();
-            let exportData = liste.map(i => ({
-                "Tarih": i.tarih,
+            let dataToExport = liste.map(i => ({
+                "Tarih": formatDate(i.tarih),
                 "Durum": i.durum,
                 "Tür": i.tur,
                 "Marka": i.marka,
                 "Model": i.model,
                 "Alış Fiyatı": i.fiyat,
                 "Kimden Alındı": i.kimden,
-                "IMEI 1": i.imei1 || i.imei,
-                "IMEI 2": i.imei2,
-                "Satış Tarihi": i.satisTarihi,
+                "IMEI 1": i.imei1 || i.imei || '',
+                "IMEI 2": i.imei2 || '',
+                "Satış Tarihi": formatDate(i.satisTarihi),
                 "Satış Fiyatı": i.satisFiyati,
-                "Kime Satıldı": i.Alici
+                "Kime Satıldı": i.Alici,
+                "İade Nedeni": i.iadeAciklama || ''
             }));
 
-            let worksheet = XLSX.utils.json_to_sheet(exportData);
+            let worksheet = XLSX.utils.json_to_sheet(dataToExport);
             let workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "İsra Stok Raporu");
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Stok_Raporu");
             XLSX.writeFile(workbook, "Isra_Bilisim_Stok_Raporu.xlsx");
         }
 
@@ -3231,12 +3263,12 @@
         }
 
         function yedekAlDosya() {
-            let paket = {
+            let veriPaketi = {
                 liste: verileriAl(),
                 silinenler: silinenUrunlerKumesi,
                 odemeler: odemeListesiniAl()
             };
-            let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(paket, null, 2));
+            let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(veriPaketi));
             let downloadAnchor = document.createElement('a');
             downloadAnchor.setAttribute("href", dataStr);
             downloadAnchor.setAttribute("download", `Isra_Bilisim_Yedek_${new Date().toISOString().slice(0,10)}.json`);
@@ -3251,17 +3283,17 @@
             let reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    let json = JSON.parse(e.target.result);
-                    if (json.liste) {
-                        verileriKaydet(json.liste);
-                        if (json.silinenler) silinenleriKaydet(json.silinenler);
-                        if (json.odemeler) odemeListesiniKaydet(json.odemeler);
+                    let parsed = JSON.parse(e.target.result);
+                    if (parsed.liste) {
+                        verileriKaydet(parsed.liste);
+                        if (parsed.silinenler) silinenleriKaydet(parsed.silinenler);
+                        if (parsed.odemeler) odemeListesiniKaydet(parsed.odemeler);
                         bildirimGoster("Yedek başarıyla yüklendi!", "homePage");
                     } else {
                         uyariPopupGoster("Geçersiz yedek dosyası formatı!");
                     }
                 } catch (err) {
-                    uyariPopupGoster("Dosya okunurken bir hata oluştu!");
+                    uyariPopupGoster("Dosya okunurken hata oluştu!");
                 }
             };
             reader.readAsText(file);

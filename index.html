@@ -12,8 +12,6 @@
     </script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js">
     </script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js">
-</script>
     <style>
         /* ---- MEVCUT STİLLER ---- */
         * {
@@ -1398,12 +1396,7 @@
         let globalOdemeler = [];
         let silinenUrunlerKumesi = [];
 
-       function firebaseVerileriniBaslat() {
-
-    db.collection("isra_tum_veriler")
-        .doc("veri_paketi")
-        .onSnapshot((doc) => {
-
+        db.collection("isra_tum_veriler").doc("veri_paketi").onSnapshot((doc) => {
             if (doc.exists) {
                 globalUrunler = doc.data().liste || [];
                 silinenUrunlerKumesi = doc.data().silinenler || [];
@@ -1411,34 +1404,17 @@
                 globalUrunler = [];
                 silinenUrunlerKumesi = [];
             }
-
             islemSonrasiGuncelleme();
-
-        }, (error) => {
-
-            console.error("Ürün verileri okunamadı:", error);
-
         });
 
-
-    db.collection("isra_odeme_listesi")
-        .doc("odeme_paketi")
-        .onSnapshot((doc) => {
-
+        db.collection("isra_odeme_listesi").doc("odeme_paketi").onSnapshot((doc) => {
             if (doc.exists) {
                 globalOdemeler = doc.data().liste || [];
             } else {
                 globalOdemeler = [];
             }
-
             islemSonrasiGuncelleme();
-
-        }, (error) => {
-
-            console.error("Ödeme verileri okunamadı:", error);
-
         });
-}
 
         function verileriAl() {
             let localData = localStorage.getItem('isra_local_urunler');
@@ -1485,50 +1461,31 @@
             if (aktifSayfa.id === 'odemePage') odemeSeciliListele();
         }
 
-       // ---------- FIREBASE ŞİFRE KONTROLÜ ----------
+        // ---------- ŞİFRE KONTROLÜ ----------
+        function sifreKontrol() {
+            const input = document.getElementById('loginPassword');
+            const hata = document.getElementById('loginError');
+            const girilen = input.value;
 
-// Firebase'de oluşturduğun kullanıcı e-postası
-const FIREBASE_KULLANICI_EMAIL = "israiletisim@gmail.com";
+            // En az 6 karakter kontrolü
+            if (girilen.length < 6) {
+                hata.textContent = '❌ Şifre en az 6 karakter olmalıdır.';
+                input.value = '';
+                input.focus();
+                return;
+            }
 
-function sifreKontrol() {
-    const input = document.getElementById('loginPassword');
-    const hata = document.getElementById('loginError');
-    const girilen = input.value.trim();
-
-    // En az 6 karakter
-    if (girilen.length < 6) {
-        hata.textContent = '❌ Şifre en az 6 karakter olmalıdır.';
-        input.focus();
-        return;
-    }
-
-    hata.textContent = 'Giriş yapılıyor...';
-
-    firebase.auth()
-        .signInWithEmailAndPassword(
-            FIREBASE_KULLANICI_EMAIL,
-            girilen
-        )
-        .then(() => {
-
-            // Giriş başarılı
-            document.getElementById('loginOverlay').classList.add('hidden');
-
-            hata.textContent = '';
-            input.value = '';
-            firebaseVerileriniBaslat();
-
-        })
-        .catch((error) => {
-
-            console.error("Firebase giriş hatası:", error);
-
-            hata.textContent = '❌ Hatalı şifre, tekrar deneyin.';
-
-            input.value = '';
-            input.focus();
-        });
-}
+            // Büyük/küçük harf duyarsız karşılaştırma
+            if (girilen.toLowerCase() === 'isravedat06*') {
+                document.getElementById('loginOverlay').classList.add('hidden');
+                hata.textContent = '';
+                input.value = '';
+            } else {
+                hata.textContent = '❌ Hatalı şifre, tekrar deneyin.';
+                input.value = '';
+                input.focus();
+            }
+        }
 
         // Enter tuşuyla giriş
         document.addEventListener('DOMContentLoaded', function() {
